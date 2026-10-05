@@ -1,0 +1,1 @@
+"""Clinical Compass backend package."""

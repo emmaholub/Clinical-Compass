@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: clinical-compass-api
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT --no-access-log
+    healthCheckPath: /health
+    envVars:
+      - key: PORTKEY_API_KEY
+        sync: false
+      - key: PORTKEY_MODEL
+        value: gpt-4o-mini
+      - key: CORS_ORIGINS
+        sync: false
+  - type: web
+    name: clinical-compass-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
