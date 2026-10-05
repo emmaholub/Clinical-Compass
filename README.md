@@ -1,6 +1,6 @@
 # Clinical Compass
 
-Patient and caregiver education: disease overview, guideline-supported treatment options, safety and treatment-benefit evidence, prompts for the doctor visit, and larger recruiting US clinical trials.
+Clinical Compass translates a new diagnosis into plain language, explains treatment options and their evidence and safety context, prepares patients for conversations with their doctor, and helps them find larger recruiting US clinical trials. It is for patient and caregiver education, not clinical decision-making.
 
 ## Run locally
 
