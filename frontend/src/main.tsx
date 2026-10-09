@@ -5,6 +5,7 @@ import "./styles.css";
 import "./plain-language.css";
 import "./error-states.css";
 import "./search-suggestions.css";
+import "./glance.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
@@ -16,7 +17,7 @@ type Treatments = { treatments: Treatment[]; issues: string[] };
 type Trial = { title: string; brief_summary: string; phase: string; enrollment: number; location: string; study_url: string };
 type Page = { disease: string; partial: boolean; overview: Overview | Failed; standard_of_care: Standard | Failed; label_safety: Treatments | Failed; alternative_treatments: Treatments | Failed; trials: { trials: Trial[] } | Failed };
 
-const sections = ["Overview", "Standard of care", "Safety of standard treatment", "Other common treatments", "Questions for your Doctor", "Clinical trials"];
+const sections = ["At a glance", "Overview", "Standard of care", "Safety of standard treatment", "Other common treatments", "Questions for your Doctor", "Clinical trials"];
 const diseaseSuggestions = ["Rheumatoid arthritis", "Type 2 diabetes", "Alzheimer’s disease", "Rett syndrome", "Asthma", "Parkinson’s disease", "Crohn’s disease", "Lupus"];
 const sectionId = (title: string) => title.toLowerCase().replace(/ /g, "-");
 
@@ -52,6 +53,17 @@ function ConditionIllustration({ disease }: { disease: string }) {
     </svg>
     <strong>{labels[type]}</strong><span className="art-footnote">Illustration for orientation</span>
   </aside>;
+}
+
+function glanceText(disease: string, summary: string) {
+  const name = disease.toLowerCase();
+  if (name.includes("rett")) return "A rare condition that changes how the brain develops. It can affect movement, talking, and everyday skills.";
+  if (name.includes("arthritis")) return "A condition that can make joints sore, stiff, or swollen, making movement harder.";
+  if (name.includes("diabetes")) return "A condition where the body has trouble keeping blood sugar at a healthy level.";
+  if (name.includes("alzheimer") || name.includes("dementia")) return "A brain condition that can slowly affect memory, thinking, and everyday activities.";
+  if (name.includes("asthma")) return "A condition that can make the airways narrow, causing coughing, wheezing, or trouble breathing.";
+  const words = summary.trim().split(/\s+/).slice(0, 20).join(" ");
+  return words ? `${words}${summary.trim().split(/\s+/).length > 20 ? "…" : ""}` : "A health condition that can affect how your body works.";
 }
 
 function Source({ source }: { source?: SourceData | null }) {
@@ -172,7 +184,8 @@ function App() {
     {page && <div className="results" aria-live="polite"><div className="results-title"><div><p className="eyebrow">YOUR CONDITION GUIDE</p><h2>{page.disease}</h2></div><span className="guide-badge"><CompassMark small /> Your guide</span></div>
       {page.partial && <div className="notice notice-partial"><span className="notice-mark">i</span><p>Some details could not be confirmed from the sources retrieved. Notes are shown where information is missing.</p></div>}
       <nav className="section-nav" aria-label="On this page">{sections.map((title, index) => <a key={title} href={`#${sectionId(title)}`}><span>{String(index + 1).padStart(2, "0")}</span>{title}</a>)}</nav>
-      <Section<Overview> title="Overview" step="01" value={page.overview}>{v => <><div className="overview-lead"><div><Preview text={v.plain_language_summary} words={40} /><Source source={v.source} /></div><ConditionIllustration disease={page.disease} /></div><div className="overview-grid"><div className="overview-list"><div className="overview-icon symptom-icon" aria-hidden="true">⌁</div><div><h3>What you may notice</h3><ul>{v.common_symptoms.map(x => <li key={x}>{x}</li>)}</ul></div></div><div className="overview-list"><div className="overview-icon cause-icon" aria-hidden="true">✳</div><div><h3>What can contribute</h3><ul>{v.causes_or_risk_factors.map(x => <li key={x}>{x}</li>)}</ul></div></div></div></>}</Section>
+      <section className="card glance-card" id="at-a-glance"><div className="section-heading"><span className="step-number">01</span><h2>At a glance</h2></div><div className="glance-content"><div><p className="glance-label">THE SHORT VERSION</p><h3>{glanceText(page.disease, 'error' in page.overview ? '' : page.overview.plain_language_summary)}</h3><p className="glance-note">This is a simple starting point. Everyone’s experience can be different.</p></div><ConditionIllustration disease={page.disease} /></div></section>
+      <Section<Overview> title="Overview" step="02" value={page.overview}>{v => <><div className="overview-lead"><div><Preview text={v.plain_language_summary} words={40} /><Source source={v.source} /></div><ConditionIllustration disease={page.disease} /></div><div className="overview-grid"><div className="overview-list"><div className="overview-icon symptom-icon" aria-hidden="true">⌁</div><div><h3>What you may notice</h3><ul>{v.common_symptoms.map(x => <li key={x}>{x}</li>)}</ul></div></div><div className="overview-list"><div className="overview-icon cause-icon" aria-hidden="true">✳</div><div><h3>What can contribute</h3><ul>{v.causes_or_risk_factors.map(x => <li key={x}>{x}</li>)}</ul></div></div></div></>}</Section>
       <Section<Standard> title="Standard of care" step="02" value={page.standard_of_care}>{v => <><div className="standard-highlight"><span className="mini-label">GUIDELINE-RECOMMENDED CARE</span><h3>{v.treatment_name}</h3><Preview text={v.description} words={38} /></div><div className="standard-meta"><span>Guideline</span><strong>{v.guideline_name}</strong><Source source={v.guideline_source} /></div><div className="benefit-block"><div className="subheading-row"><h4>How well can treatment work?</h4><span className="mini-label">Study results</span></div><p className="muted">Results depend on the person and the outcome a study measures.</p>{v.efficacy_treatment_name && <p className="study-drug">Evidence for <strong>{v.efficacy_treatment_name}</strong></p>}<Evidence finding={v.efficacy} empty="No treatment benefit could be verified in the studies retrieved." /></div><details className="prescribing-note"><summary>About prescribing volume</summary><p>{v.prescribing_volume_status}</p><p>Options are ordered by the cited guideline, not by prescription totals.</p></details><Issues issues={v.issues} /></>}</Section>
       <Section<Treatments> title="Safety of standard treatment" step="03" value={page.label_safety}>{v => <TreatmentList data={v} />}</Section>
       <Section<Treatments> title="Other common treatments" step="04" value={page.alternative_treatments}>{v => <TreatmentList data={v} />}</Section>
