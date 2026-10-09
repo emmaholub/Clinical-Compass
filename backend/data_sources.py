@@ -125,7 +125,7 @@ BRANDS = {"methotrexate": "Trexall", "tofacitinib": "Xeljanz", "upadacitinib": "
           "empagliflozin": "Jardiance", "dapagliflozin": "Farxiga", "semaglutide": "Ozempic",
           "sitagliptin": "Januvia", "donepezil": "Aricept", "rivastigmine": "Exelon",
           "galantamine": "Razadyne", "memantine": "Namenda", "lecanemab": "Leqembi",
-          "donanemab": "Kisunla"}
+          "donanemab": "Kisunla", "trofinetide": "Daybue"}
 
 
 def openfda_label(drug_name: str, *, client: CachedJsonClient | None = None,
@@ -302,8 +302,53 @@ def search_guidelines(disease: str, *, max_results: int = 5,
             except httpx.HTTPError:
                 continue
         if not docs:
-            docs.extend(published_findings(disease, "treatment", client=api, guidelines=True))
+            try:
+                docs.extend(published_findings(disease, "treatment", client=api, guidelines=True))
+            except httpx.HTTPError:
+                pass
+        # Rare diseases often have no NICE guideline page. Use an authoritative
+        # US government disease page plus an FDA label as a clearly identified
+        # evidence fallback; the model must not call this a universal guideline.
+        if not docs and disease.casefold() == "rett syndrome":
+            try:
+                url = "https://www.ninds.nih.gov/health-information/disorders/rett-syndrome"
+                docs.append(Document(url, "NINDS: Rett Syndrome", _html_text(api.text(url)), "NIH disease information"))
+            except httpx.HTTPError:
+                pass
+            try:
+                _, label_docs = label_documents("trofinetide", client=api)
+                docs.extend(label_docs)
+            except (LookupError, httpx.HTTPError):
+                pass
     return docs[:max_results]
+
+
+def overview_documents(disease: str, *, client: CachedJsonClient | None = None,
+                       max_results: int = 4) -> list[Document]:
+    """Fetch plain-language disease evidence for overview generation.
+
+    Named government pages are preferred for rare diseases; PubMed abstracts
+    are a bounded fallback when no disease page is available.
+    """
+    disease = normalize_disease(disease)
+    with _client(client) as api:
+        docs: list[Document] = []
+        urls = {
+            "rett syndrome": ("NINDS: Rett Syndrome", "https://www.ninds.nih.gov/health-information/disorders/rett-syndrome"),
+            "rheumatoid arthritis": ("NIAMS: Rheumatoid Arthritis", "https://www.niams.nih.gov/health-topics/rheumatoid-arthritis"),
+        }
+        if disease.casefold() in urls:
+            title, url = urls[disease.casefold()]
+            try:
+                docs.append(Document(url, title, _html_text(api.text(url)), "NIH disease information"))
+            except httpx.HTTPError:
+                pass
+        if not docs:
+            try:
+                docs = published_findings(disease, "disease overview", client=api, guidelines=False)
+            except httpx.HTTPError:
+                docs = []
+        return docs[:max_results]
 
 
 def clinical_trials(disease: str, *, client: CachedJsonClient | None = None, page_size: int = 100) -> dict:

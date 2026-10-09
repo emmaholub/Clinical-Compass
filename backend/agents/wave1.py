@@ -5,7 +5,7 @@ import asyncio
 import json
 from typing import Any
 
-from backend.data_sources import CachedJsonClient, clinical_trials, normalize_disease, search_guidelines
+from backend.data_sources import CachedJsonClient, clinical_trials, normalize_disease, overview_documents, search_guidelines
 from backend.llm import generate
 from backend.models import ClinicalTrial, OverviewOutput, StandardOfCareOutput, TrialsOutput
 from backend.validation import checked_value, verified
@@ -14,11 +14,15 @@ DISCLAIMER = "Educational only, not medical advice. Talk with your doctor."
 
 
 async def overview_agent(disease: str) -> OverviewOutput:
+    docs = await asyncio.to_thread(overview_documents, disease)
+    if not docs:
+        raise LookupError("No authoritative disease overview source could be retrieved")
     return await generate(
         OverviewOutput,
-        "Write an overview at a sixth-grade reading level. Do not invent sources or numerical claims. "
-        "Use null for source if no document was supplied.",
-        f"Disease: {disease}",
+        "Write an overview at a sixth-grade reading level using only the supplied authoritative disease document. "
+        "Explain what it is, common symptoms, and known causes or risk factors in calm language. "
+        "Copy one contiguous source quote exactly and never fill gaps from memory.",
+        json.dumps({"disease": disease, "documents": [doc.prompt() for doc in docs]}),
     )
 
 
@@ -39,11 +43,11 @@ async def standard_of_care_agent(disease: str) -> StandardOfCareOutput:
         return problems
     result = await generate(
         StandardOfCareOutput,
-        "Identify treatment options ONLY for the requested disease from the supplied guidelines. "
+        "Identify treatment options ONLY for the requested disease from the supplied guideline or authoritative government/FDA evidence. "
         "Copy the input disease name exactly in the output disease field. "
         "Describe the population, disease stage, and conditions that change first-line choices. "
         "A guideline recommendation is not a prescription for this person. "
-        "Use the guideline's country in its name. Choose at most five named generic "
+        "Name the evidence type accurately (for example, NIH disease information or FDA label rather than calling it a clinical guideline). Choose at most five named generic "
         "medicines (not classes or doses), including one representative first-line option "
         "and the other guideline-supported options as alternatives. Explain equivalent first-line "
         "alternatives accurately; do not imply they are inferior. "
