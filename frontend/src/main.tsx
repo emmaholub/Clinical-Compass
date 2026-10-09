@@ -2,6 +2,7 @@ import { StrictMode, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import "./plain-language.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
@@ -79,6 +80,18 @@ function Issues({ issues = [] }: { issues?: string[] }) {
   return issues.length > 0 && <div className="section-note" role="status">{[...new Set(issues)].map(issue => <p key={issue}>{issue}</p>)}</div>;
 }
 
+function PlainLanguageKey() {
+  return <details className="plain-language-key">
+    <summary>Medical terms, in everyday language</summary>
+    <dl>
+      <div><dt>Benefit in studies</dt><dd>How well the treatment helped people in a research study.</dd></div>
+      <div><dt>Stopped because of side effects</dt><dd>How often people had to stop taking it because it caused problems.</dd></div>
+      <div><dt>Boxed warning</dt><dd>The FDA’s strongest warning about a serious safety concern.</dd></div>
+      <div><dt>FDA event reports</dt><dd>Reports people or health professionals sent to the FDA. They do not prove that a medicine caused a problem or show how often it happens.</dd></div>
+    </dl>
+  </details>;
+}
+
 function Section<T extends object>({ title, step, value, children }: { title: string; step: string; value: T | Failed; children: (data: T) => ReactNode }) {
   return <section className="card content-section" id={sectionId(title)}>
     <div className="section-heading"><span className="step-number">{step}</span><h2>{title}</h2></div>
@@ -90,14 +103,14 @@ function TreatmentCard({ treatment: t }: { treatment: Treatment }) {
   const moreEffects = t.common_side_effects.slice(7);
   return <article className="treatment">
     <div className="treatment-heading"><span className="treatment-symbol" aria-hidden="true">✳</span><div><h3>{t.treatment_name}</h3><a className="label-link" href={t.label_url} target="_blank" rel="noreferrer">FDA label: {t.label_name} ↗</a></div></div>
-    {t.description && <Preview text={t.description} words={30} />}
+    {t.description && <div className="treatment-purpose"><span className="mini-label">WHAT IT IS USED FOR</span><Preview text={t.description} words={30} /></div>}
     <div className="treatment-grid">
       <div className="safety-block"><h4>Common side effects</h4>
         {t.common_side_effects.length ? <><ul className="effect-chips">{t.common_side_effects.slice(0, 7).map(effect => <li key={effect}>{effect}</li>)}</ul>{moreEffects.length > 0 && <details className="read-more"><summary>See {moreEffects.length} more</summary><ul className="effect-chips">{moreEffects.map(effect => <li key={effect}>{effect}</li>)}</ul></details>}<Source source={t.common_side_effects_source} /></> : <p className="muted">Could not verify side effects from the sources retrieved.</p>}
       </div>
       <div className="safety-block"><h4>Stopped because of side effects</h4><Evidence finding={t.discontinuation_rate} empty="No verified rate found in the retrieved label or studies." /></div>
     </div>
-    <div className="benefit-block"><h4>Treatment benefit in studies</h4><Evidence finding={t.efficacy} empty="No disease-specific benefit verified in the retrieved studies." /></div>
+    <div className="benefit-block"><h4>What studies found</h4><p className="plain-label">This is the treatment’s measured benefit in research—not a promise of what will happen for one person.</p><Evidence finding={t.efficacy} empty="No disease-specific benefit was verified in the studies retrieved." /></div>
     {t.published_trial_evidence.length > 0 && <details className="more-evidence"><summary>More published safety findings ({t.published_trial_evidence.length})</summary>{t.published_trial_evidence.map((e, i) => <Evidence key={i} finding={e} empty="" />)}</details>}
     {t.boxed_warning ? <div className="warning"><span className="warning-icon" aria-hidden="true">!</span><div><strong>FDA boxed warning</strong><p>This label has a boxed warning. Read the details and discuss what they mean for you with your doctor.</p><details><summary>Read the warning from the label</summary><p className="warning-copy">{t.boxed_warning.value}</p><Source source={t.boxed_warning.source} /></details></div></div> : <p className="warning-status">{t.boxed_warning_status === "not_in_selected_label" ? "No boxed warning in the selected label. Other warnings may still apply." : "Boxed-warning status could not be verified."}</p>}
     {t.faers_frequently_reported_reactions.length > 0 && <details className="more-evidence"><summary>FDA event reports ({t.faers_frequently_reported_reactions.length})</summary><p className="muted">Voluntary reports do not show how often a side effect happens or prove the drug caused it.</p><p>{t.faers_frequently_reported_reactions.map(r => r.toLowerCase()).join(" · ")}</p><a href={t.faers_source_url || undefined} target="_blank" rel="noreferrer">View FAERS reports ↗</a></details>}
@@ -106,7 +119,7 @@ function TreatmentCard({ treatment: t }: { treatment: Treatment }) {
 }
 
 function TreatmentList({ data }: { data: Treatments }) {
-  return <><Issues issues={data.issues} />{data.treatments.map(t => <TreatmentCard key={t.treatment_name} treatment={t} />)}
+  return <><PlainLanguageKey /><Issues issues={data.issues} />{data.treatments.map(t => <TreatmentCard key={t.treatment_name} treatment={t} />)}
     {!data.treatments.length && !data.issues.length && <p className="muted">No additional treatment was identified in the guideline retrieved.</p>}</>;
 }
 
