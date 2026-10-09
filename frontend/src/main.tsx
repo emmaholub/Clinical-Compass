@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./plain-language.css";
+import "./error-states.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
@@ -80,6 +81,16 @@ function Issues({ issues = [] }: { issues?: string[] }) {
   return issues.length > 0 && <div className="section-note" role="status">{[...new Set(issues)].map(issue => <p key={issue}>{issue}</p>)}</div>;
 }
 
+function HelpfulError({ section, detail }: { section: string; detail: string }) {
+  const treatmentSection = section === "Standard of care" || section === "Safety of standard treatment" || section === "Other common treatments";
+  const message = treatmentSection
+    ? "We found information about this disease, but not enough reliable treatment guidance to summarize safely. Try another spelling or discuss the condition with a specialist."
+    : section === "Overview"
+      ? "We found the disease name, but not enough reliable plain-language information to explain it safely. Try another spelling or discuss it with a healthcare professional."
+      : "We couldn't retrieve enough reliable information for this section right now. Please try again or use the linked public sources when available.";
+  return <div className="helpful-error" role="status"><strong>{message}</strong><details><summary>Why this section is unavailable</summary><p>{detail}</p></details></div>;
+}
+
 function PlainLanguageKey() {
   return <details className="plain-language-key">
     <summary>Medical terms, in everyday language</summary>
@@ -95,7 +106,7 @@ function PlainLanguageKey() {
 function Section<T extends object>({ title, step, value, children }: { title: string; step: string; value: T | Failed; children: (data: T) => ReactNode }) {
   return <section className="card content-section" id={sectionId(title)}>
     <div className="section-heading"><span className="step-number">{step}</span><h2>{title}</h2></div>
-    {'error' in value ? <p className="muted">{value.error}</p> : children(value)}
+    {'error' in value ? <HelpfulError section={title} detail={value.error} /> : children(value)}
   </section>;
 }
 
