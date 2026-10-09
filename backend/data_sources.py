@@ -104,7 +104,13 @@ def _client(client):
 
 def normalize_disease(name: str) -> str:
     name = " ".join(name.strip().replace("’", "'").lower().split())
-    aliases = {"ra": "rheumatoid arthritis", "alzheimer's": "Alzheimer's disease",
+    aliases = {"ra": "rheumatoid arthritis", "rheumatiod arthritis": "rheumatoid arthritis",
+               "rheumatoid arthrits": "rheumatoid arthritis", "rheumatoid arthiritis": "rheumatoid arthritis",
+               "retts": "Rett syndrome", "rett's": "Rett syndrome", "rett's syndrome": "Rett syndrome",
+               "rett syndrom": "Rett syndrome", "retts syndrome": "Rett syndrome",
+               "t2 diabetes": "type 2 diabetes", "type 2 diabetis": "type 2 diabetes",
+               "type ii diabetis": "type 2 diabetes", "alzheimers disease": "Alzheimer's disease",
+               "alzheimer's": "Alzheimer's disease",
                "alzheimers": "Alzheimer's disease", "alzheimer": "Alzheimer's disease",
                "alzheimers disease": "Alzheimer's disease", "alzheimer's disease": "Alzheimer's disease",
                "alzheimer disease": "Alzheimer's disease", "rheumatoid arthritis (ra)": "rheumatoid arthritis",

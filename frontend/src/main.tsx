@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./plain-language.css";
 import "./error-states.css";
+import "./search-suggestions.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
@@ -16,6 +17,7 @@ type Trial = { title: string; brief_summary: string; phase: string; enrollment: 
 type Page = { disease: string; partial: boolean; overview: Overview | Failed; standard_of_care: Standard | Failed; label_safety: Treatments | Failed; alternative_treatments: Treatments | Failed; trials: { trials: Trial[] } | Failed };
 
 const sections = ["Overview", "Standard of care", "Safety of standard treatment", "Other common treatments", "Questions for your Doctor", "Clinical trials"];
+const diseaseSuggestions = ["Rheumatoid arthritis", "Type 2 diabetes", "Alzheimer’s disease", "Rett syndrome", "Asthma", "Parkinson’s disease", "Crohn’s disease", "Lupus"];
 const sectionId = (title: string) => title.toLowerCase().replace(/ /g, "-");
 
 function CompassMark({ small = false }: { small?: boolean }) {
@@ -139,6 +141,7 @@ function App() {
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const suggestions = diseaseSuggestions.filter(name => name.toLowerCase().includes(disease.trim().toLowerCase())).slice(0, 5);
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!disease.trim() || loading) return;
@@ -162,7 +165,7 @@ function App() {
     </header>
 
     <div className="notice"><span className="notice-mark" aria-hidden="true">i</span><p>For learning and conversation with your doctor. This guide is not a diagnosis or medical advice.</p></div>
-    <form className="search-card" onSubmit={submit}><label htmlFor="disease">What would you like to learn about?</label><p className="search-hint">Enter a disease or health condition</p><div className="search"><span className="search-icon" aria-hidden="true">⌕</span><input id="disease" required maxLength={120} value={disease} onChange={e => setDisease(e.target.value)} placeholder="Try rheumatoid arthritis" /><button disabled={loading}>{loading ? "Searching…" : <>Explore condition <span aria-hidden="true">→</span></>}</button></div><p className="search-example">Examples: asthma · type 2 diabetes · Alzheimer’s disease</p></form>
+    <form className="search-card" onSubmit={submit}><label htmlFor="disease">What would you like to learn about?</label><p className="search-hint">Enter a disease or health condition—we’ll help with common names and spelling.</p><div className="search"><span className="search-icon" aria-hidden="true">⌕</span><input id="disease" list="disease-suggestions" required maxLength={120} value={disease} onChange={e => setDisease(e.target.value)} placeholder="Try rheumatoid arthritis" /><datalist id="disease-suggestions">{diseaseSuggestions.map(name => <option key={name} value={name} />)}</datalist><button disabled={loading}>{loading ? "Searching…" : <>Explore condition <span aria-hidden="true">→</span></>}</button></div>{disease.trim() && suggestions.length > 0 && <div className="suggestions" aria-label="Condition suggestions">{suggestions.map(name => <button type="button" key={name} onClick={() => setDisease(name)}>{name}<span>Use this name →</span></button>)}</div>}<p className="search-example">Try an abbreviation or alternate spelling, such as “RA,” “T2D,” or “retts syndrome.”</p></form>
 
     {loading && <div className="loading-card" role="status"><span className="loader" /><div><strong>Finding clear, reliable information</strong><p>Checking guidelines, medicine labels, and published studies. This may take a little while.</p></div></div>}
     {error && <div className="error" role="alert">{error} Please try again.</div>}
