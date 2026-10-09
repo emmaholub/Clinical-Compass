@@ -1,0 +1,37 @@
+/* Professional clinical palette: deep blue foundation with confident green accents. */
+:root {
+  --ink: #102f4f;
+  --muted: #536b7d;
+  --blue: #1268a3;
+  --blue-dark: #084b7a;
+  --green: #147a5b;
+  --green-dark: #0b6047;
+  --green-pale: #e3f2ec;
+  --line: #d5e1e9;
+  --paper: #ffffff;
+}
+
+body { background: #f2f6f9; }
+.hero { background: linear-gradient(112deg, #dceee8 0%, #d9ebf5 56%, #c8dfed 100%); }
+.hero h1, .hero h2 { color: #0d3559; }
+.hero h1 span { color: #087351; }
+.brand, .hero-art { color: #0b6b50; }
+.eyebrow, .mini-label { color: #0b6047; }
+.hero-art .orbit { border-color: #3188a066; }
+.orbit-dot { background: #087351; }
+.dot-two { background: #1268a3; }
+.search button { background: #0b6b50; }
+.search button:hover { background: #07543e; }
+.search:focus-within { border-color: #1b78ae; box-shadow: 0 0 0 3px #1268a326; }
+.section-nav a:hover { border-color: #7eb7d5; background: #eaf4f9; color: #084b7a; }
+.section-nav a span, .search-icon { color: #1268a3; }
+.condition-art { background: linear-gradient(145deg, #e6f3ed, #e4f0f7); }
+.art-drawing { stroke: #0b6b50; }
+.art-point { fill: #1268a3; }
+.standard-highlight { background: linear-gradient(115deg, #e6f3ec, #e5f1f8); border-color: #b8d9cc; }
+.step-number, .treatment-symbol { background: #e3f2ec; color: #0b6047; }
+.badge { background: #d9eee5; color: #075f45; }
+.effect-chips li { border-color: #c5e0d4; color: #125e4b; }
+.trial-intro { background: #e7f3eb; }
+.trial-link, .label-link { color: #084b7a; }
+.trial:hover { border-color: #87b9d3; }

@@ -7,6 +7,7 @@ import "./error-states.css";
 import "./search-suggestions.css";
 import "./glance.css";
 import "./analytics.css";
+import "./professional-palette.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
