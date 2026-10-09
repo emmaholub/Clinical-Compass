@@ -6,6 +6,7 @@ import "./plain-language.css";
 import "./error-states.css";
 import "./search-suggestions.css";
 import "./glance.css";
+import "./analytics.css";
 
 type SourceData = { source_url: string; source_quote: string; source_title?: string | null };
 type Finding = { value: string; source: SourceData; evidence_type: string; outcome?: string | null; population?: string | null; follow_up?: string | null; comparator?: string | null };
@@ -150,6 +151,7 @@ function TreatmentList({ data }: { data: Treatments }) {
 
 function App() {
   const [disease, setDisease] = useState("");
+  const [analyticsConsent, setAnalyticsConsent] = useState(() => localStorage.getItem("clinical-compass-analytics-consent") === "yes");
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -163,6 +165,12 @@ function App() {
       const response = await fetch(`${base}/api/disease/${encodeURIComponent(disease.trim())}`);
       if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("We could not reach the disease information service.");
       setPage(await response.json());
+      if (analyticsConsent) {
+        void fetch(`${base}/api/analytics/disease-lookup`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ disease: disease.trim(), analytics_consent: true }),
+        }).catch(() => undefined);
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); }
     finally { setLoading(false); }
   }
@@ -177,7 +185,7 @@ function App() {
     </header>
 
     <div className="notice"><span className="notice-mark" aria-hidden="true">i</span><p>For learning and conversation with your doctor. This guide is not a diagnosis or medical advice.</p></div>
-    <form className="search-card" onSubmit={submit}><label htmlFor="disease">What would you like to learn about?</label><p className="search-hint">Enter a disease or health condition—we’ll help with common names and spelling.</p><div className="search"><span className="search-icon" aria-hidden="true">⌕</span><input id="disease" list="disease-suggestions" required maxLength={120} value={disease} onChange={e => setDisease(e.target.value)} placeholder="Try rheumatoid arthritis" /><datalist id="disease-suggestions">{diseaseSuggestions.map(name => <option key={name} value={name} />)}</datalist><button disabled={loading}>{loading ? "Searching…" : <>Explore condition <span aria-hidden="true">→</span></>}</button></div>{disease.trim() && suggestions.length > 0 && <div className="suggestions" aria-label="Condition suggestions">{suggestions.map(name => <button type="button" key={name} onClick={() => setDisease(name)}>{name}<span>Use this name →</span></button>)}</div>}<p className="search-example">Try an abbreviation or alternate spelling, such as “RA,” “T2D,” or “retts syndrome.”</p></form>
+    <form className="search-card" onSubmit={submit}><label htmlFor="disease">What would you like to learn about?</label><p className="search-hint">Enter a disease or health condition—we’ll help with common names and spelling.</p><div className="search"><span className="search-icon" aria-hidden="true">⌕</span><input id="disease" list="disease-suggestions" required maxLength={120} value={disease} onChange={e => setDisease(e.target.value)} placeholder="Try rheumatoid arthritis" /><datalist id="disease-suggestions">{diseaseSuggestions.map(name => <option key={name} value={name} />)}</datalist><button disabled={loading}>{loading ? "Searching…" : <>Explore condition <span aria-hidden="true">→</span></>}</button></div>{disease.trim() && suggestions.length > 0 && <div className="suggestions" aria-label="Condition suggestions">{suggestions.map(name => <button type="button" key={name} onClick={() => setDisease(name)}>{name}<span>Use this name →</span></button>)}</div>}<p className="search-example">Try an abbreviation or alternate spelling, such as “RA,” “T2D,” or “retts syndrome.”</p><label className="analytics-choice"><input type="checkbox" checked={analyticsConsent} onChange={e => { const enabled = e.target.checked; setAnalyticsConsent(enabled); localStorage.setItem("clinical-compass-analytics-consent", enabled ? "yes" : "no"); }} /> Help improve Clinical Compass with anonymous daily counts of condition lookups. No account, IP address, or search history is stored.</label></form>
 
     {loading && <div className="loading-card" role="status"><span className="loader" /><div><strong>Finding clear, reliable information</strong><p>Checking guidelines, medicine labels, and published studies. This may take a little while.</p></div></div>}
     {error && <div className="error" role="alert">{error} Please try again.</div>}

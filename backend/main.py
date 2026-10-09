@@ -1,16 +1,30 @@
 """FastAPI application for Clinical Compass."""
+from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from backend.analytics import initialize_analytics, record_disease_lookup
 from backend.request_limits import check_request_limit
 
 from backend.boss import run_disease_lookup
 
-app = FastAPI(title="Clinical Compass", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    initialize_analytics()
+    yield
+
+app = FastAPI(title="Clinical Compass", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware,
     allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(',') if origin.strip()],
-    allow_methods=["GET"], allow_headers=["Content-Type"])
+    allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+
+
+class DiseaseLookup(BaseModel):
+    disease: str = Field(min_length=1, max_length=120)
+    analytics_consent: bool = False
 
 
 @app.get("/health")
@@ -37,3 +51,11 @@ async def disease_lookup(disease: str, request: Request) -> dict:
         return await run_disease_lookup(disease)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Disease lookup failed") from exc
+
+
+@app.post("/api/analytics/disease-lookup")
+async def record_lookup(payload: DiseaseLookup) -> dict[str, bool | str]:
+    if not payload.analytics_consent:
+        return {"recorded": False}
+    canonical = record_disease_lookup(payload.disease.strip())
+    return {"recorded": True, "disease": canonical}

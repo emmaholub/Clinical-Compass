@@ -6,6 +6,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 cache/
+data/analytics.db
 dist/
 node_modules/
 *.tsbuildinfo

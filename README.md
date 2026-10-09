@@ -23,6 +23,24 @@ npm run dev -- --host 127.0.0.1
 
 Open http://127.0.0.1:5173. The development proxy forwards `/api` to port 8000. The API docs at `/docs` are developer documentation, not the patient website.
 
+## Privacy-preserving lookup analytics
+
+The search form includes an optional, unchecked consent box. If a visitor enables
+it, the site sends only the condition text needed for normalization to
+`POST /api/analytics/disease-lookup`. The backend stores one daily aggregate per
+canonical disease in `data/analytics.db` (`disease_key`, `lookup_date`, and
+`lookup_count`). It does not store IP addresses, emails, account IDs, browser
+identifiers, raw search history, or medical results. Turning the box off stops
+future counting; clearing the browser's local storage removes the saved choice.
+
+For local development, SQLite is convenient. Before public use, move this table
+to a persistent managed database such as Render Postgres because Render's local
+filesystem may be replaced during redeploys. Add a retention policy (for
+example, delete counts older than 12 months), protect any aggregate reporting
+route with administrator authentication, rate-limit the analytics endpoint, and
+describe the opt-in choice in the site's privacy notice. Do not use these
+aggregates for advertising, insurance decisions, or individual medical care.
+
 ## Audit of the original build
 
 The earlier test suite mocked the entire boss and only checked overview fields. Consequently, HTTP 200, empty safety arrays, and unsupported treatment defaults could all pass. Those checks did not establish that the treatment sections worked.
