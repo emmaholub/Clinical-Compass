@@ -4,14 +4,16 @@ Clinical Compass translates a new diagnosis into plain language, explains treatm
 
 ## Run locally
 
-From this directory, activate the existing virtual environment or use its executables directly:
+From a fresh clone, use Python 3.10 or newer to create the local virtual environment and install the pinned dependencies:
 
 ```sh
+python3 --version
+python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Set `PORTKEY_API_KEY` in `.env` (or your shell environment). `.env.example` contains the supported settings. The API checks both `.env` inside this repo and the parent folder used by the course staff, without overwriting shell variables or a repo-local value. With the course key, keep `PORTKEY_MODEL=gpt-6-luna`; use a personal key if you choose another model. No key belongs in frontend code. Disease searches have a configurable in-memory per-connection rate limit. API access logs are disabled in the Render start command because the requested condition appears in the URL.
+Set `PORTKEY_API_KEY` in `.env` (or your shell environment) before starting the backend. `.env.example` contains the supported settings. The API checks both `.env` inside this repo and the parent folder used by the course staff, without overwriting shell variables or a repo-local value. With the course key, keep `PORTKEY_MODEL=gpt-6-luna`; use a personal key if you choose another model. No key belongs in frontend code. Disease searches have a configurable in-memory per-connection rate limit. API access logs are disabled in the Render start command because the requested condition appears in the URL.
 
 In a second terminal:
 
