@@ -167,3 +167,16 @@ def test_medlineplus_fallback_returns_plain_language_summary(tmp_path):
     assert docs[0].source_url == 'https://medlineplus.gov/example.html'
     assert 'pain and fatigue' in docs[0].text
     assert docs[0].kind == 'NIH disease information'
+
+
+def test_alzheimers_guidance_includes_medication_appraisal(tmp_path):
+    def handler(request):
+        if request.url.path.endswith('/ng97/chapter/Recommendations'):
+            return httpx.Response(200, text='<main>Dementia management recommendations and Alzheimer medicines.</main>')
+        if request.url.path.endswith('/ta217/chapter/1-Recommendations'):
+            return httpx.Response(200, text='<main>The medicines donepezil, galantamine, rivastigmine and memantine are options for Alzheimer disease.</main>')
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        docs = search_guidelines("Alzheimer's disease", client=CachedJsonClient(tmp_path, client=http))
+    assert any('ta217' in doc.source_url and 'donepezil' in doc.text for doc in docs)

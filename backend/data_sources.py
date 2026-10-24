@@ -329,7 +329,10 @@ GUIDELINES = {
         ("American Diabetes Association: Pharmacologic Approaches to Glycemic Treatment (2026)",
          "https://diabetesjournals.org/care/article/49/Supplement_1/S183/163934/9-Pharmacologic-Approaches-to-Glycemic-Treatment"),
     ],
-    "alzheimer's disease": [("NICE (UK): Dementia management", "https://www.nice.org.uk/guidance/ng97/chapter/Recommendations")],
+    "alzheimer's disease": [
+        ("NICE (UK): Alzheimer’s medicines (TA217)", "https://www.nice.org.uk/guidance/ta217/chapter/1-Recommendations"),
+        ("NICE (UK): Dementia management", "https://www.nice.org.uk/guidance/ng97/chapter/Recommendations"),
+    ],
 }
 
 

@@ -7,7 +7,12 @@ from backend.models import SourceMetadata, SourcedValue
 
 
 def validate_source_quote(quote: str, fetched_text: str) -> bool:
-    return bool(quote.strip()) and quote in fetched_text
+    # HTML rendering may turn the same contiguous passage into different
+    # line-break/spacing patterns. Compare canonical whitespace while keeping
+    # the URL-specific exact-passage requirement.
+    canonical_quote = " ".join(quote.split())
+    canonical_text = " ".join(fetched_text.split())
+    return bool(canonical_quote) and canonical_quote in canonical_text
 
 
 def verified(source: SourceMetadata | None, docs: list[Document]) -> bool:
@@ -20,7 +25,11 @@ def verified(source: SourceMetadata | None, docs: list[Document]) -> bool:
 def checked_value(value: SourcedValue | None, docs: list[Document]) -> SourcedValue | None:
     if value is None or value_problem(value, docs):
         return None
-    doc = next(d for d in docs if d.source_url == str(value.source.source_url) and value.source.source_quote in d.text)
+    doc = next(
+        d for d in docs
+        if d.source_url == str(value.source.source_url)
+        and validate_source_quote(value.source.source_quote, d.text)
+    )
     value.evidence_type = doc.kind
     return value
 

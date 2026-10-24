@@ -111,6 +111,38 @@ async def test_one_drug_failure_retains_other_drugs(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_invalid_page_quote_anchors_to_verified_first_line(monkeypatch):
+    from backend.agents.wave1 import standard_of_care_agent
+
+    guide = Document(
+        'https://example.org/guideline', 'Fixture guideline',
+        'First-line medicine is alpha. This is a separate population note. Alternative medicine beta is considered.',
+        'Guideline',
+    )
+    valid = SourceMetadata(source_url=guide.source_url, source_quote='First-line medicine is alpha.')
+    non_contiguous = SourceMetadata(
+        source_url=guide.source_url,
+        source_quote='First-line medicine is alpha. Alternative medicine beta is considered.',
+    )
+    choices = [DrugChoice(name='alpha', role='first_line', description='Fixture option', guideline_source=valid)]
+    monkeypatch.setattr('backend.agents.wave1.search_guidelines', lambda d: [guide])
+
+    async def generate(output, instructions, evidence, **kwargs):
+        return StandardOfCareOutput(
+            disease='condition', treatment_name='alpha', treatment_type='Medicine',
+            description='Fixture plan', guideline_name='Fixture guideline',
+            guideline_source=non_contiguous, drugs=choices,
+            medical_disclaimer='Educational only',
+        )
+
+    monkeypatch.setattr('backend.agents.wave1.generate', generate)
+    result = await standard_of_care_agent('condition')
+    assert result.guideline_source.source_quote == valid.source_quote
+    assert result.drug_names == ['alpha']
+    assert result.issues
+
+
+@pytest.mark.anyio
 async def test_workers_run_in_parallel_and_timeout_is_partial(monkeypatch):
     import backend.boss as boss
     wire_providers(monkeypatch, 'condition', 'first', 'other')

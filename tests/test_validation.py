@@ -12,6 +12,15 @@ def test_quote_must_match_its_own_url():
     assert verified(SourceMetadata(source_url='https://example.org/a', source_quote='40% improved'), docs)
 
 
+def test_quote_matching_ignores_rendering_whitespace():
+    docs = [Document('https://example.org/a', 'A', 'The medicine is recommended\nfor mild disease.', 'Guideline')]
+    source = SourceMetadata(
+        source_url='https://example.org/a',
+        source_quote='The medicine is recommended for mild disease.',
+    )
+    assert verified(source, docs)
+
+
 def test_valid_quote_does_not_allow_invented_number_or_follow_up():
     docs = [Document('https://example.org/a', 'A', '40% improved at 24 weeks', 'Published trial')]
     claim = SourcedValue(value='90% improved', source=SourceMetadata(source_url='https://example.org/a', source_quote=docs[0].text))

@@ -67,8 +67,6 @@ async def standard_of_care_agent(disease: str) -> StandardOfCareOutput:
     )
     if normalize_disease(result.disease) != disease:
         raise ValueError("Treatment evidence belongs to another disease")
-    if not verified(result.guideline_source, docs):
-        raise ValueError("Guideline quote did not match the fetched source")
     valid = []
     result.issues = []
     for drug in result.drugs:
@@ -77,8 +75,17 @@ async def standard_of_care_agent(disease: str) -> StandardOfCareOutput:
         else:
             result.issues.append(f"Evidence for {drug.name} could not be verified.")
     result.drugs = valid
-    if not any(drug.role == "first_line" for drug in valid):
+    first_line = next((drug for drug in valid if drug.role == "first_line"), None)
+    if first_line is None:
         raise ValueError("No first-line option had a verified guideline citation")
+    # Models sometimes summarize several numbered recommendations in the
+    # overview citation. That is not one contiguous passage, even when every
+    # individual drug citation is valid. Anchor the page-level citation to a
+    # verified first-line passage instead of discarding the valid treatment
+    # plan; unsupported drug citations were already removed above.
+    if not verified(result.guideline_source, docs):
+        result.guideline_source = first_line.guideline_source
+        result.issues.append("The overall guideline citation was anchored to the verified first-line recommendation.")
     result.drug_names = [drug.name for drug in valid]
     result.efficacy = checked_value(result.efficacy, docs)
     result.medical_disclaimer = DISCLAIMER
