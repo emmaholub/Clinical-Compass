@@ -11,7 +11,7 @@ From this directory, activate the existing virtual environment or use its execut
 .venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Set `PORTKEY_API_KEY` in `.env` (or your shell environment). `.env.example` contains the supported settings. The API loads `.env` without overwriting existing environment values. No key belongs in frontend code. `PORTKEY_MODEL` is a gateway model alias; the gateway's routing determines the actual provider/model and its price. Disease searches have a configurable in-memory per-connection rate limit. API access logs are disabled in the Render start command because the requested condition appears in the URL.
+Set `PORTKEY_API_KEY` in `.env` (or your shell environment). `.env.example` contains the supported settings. The API checks both `.env` inside this repo and the parent folder used by the course staff, without overwriting shell variables or a repo-local value. With the course key, keep `PORTKEY_MODEL=gpt-6-luna`; use a personal key if you choose another model. No key belongs in frontend code. Disease searches have a configurable in-memory per-connection rate limit. API access logs are disabled in the Render start command because the requested condition appears in the URL.
 
 In a second terminal:
 
@@ -74,6 +74,14 @@ ClinicalTrials.gov discovery includes studies with US locations, recruiting over
 cd frontend
 npm run build
 ```
+
+## Submission checklist
+
+- `report.html` and `slides.html` are self-contained submission artifacts in the repository.
+- Run the dry run from a fresh clone with the staff `.env` one directory above the clone.
+- Capture one real lookup showing the treatment evidence, one blocked/partial-result case, and the browser console free of errors.
+- Record token counts and cost from the Portkey dashboard for at least three representative lookups; estimates without measured runs earn only partial tokenomics credit.
+- Ask one patient, caregiver, or health professional to try the app and record a before/after time or short quote for the impact section.
 
 With both servers running and Chrome installed, opt-in live browser tests query public sources and make billable Portkey calls:
 

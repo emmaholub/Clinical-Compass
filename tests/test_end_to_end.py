@@ -27,6 +27,7 @@ def wire_providers(monkeypatch, disease, first, other):
     choices = [DrugChoice(name=name, role=role, description='Fixture option', guideline_source=source)
                for name, role in [(first, 'first_line'), (other, 'alternative')]]
     monkeypatch.setattr('backend.agents.wave1.search_guidelines', lambda d: [guide])
+    monkeypatch.setattr('backend.agents.wave1.overview_documents', lambda d: [guide])
     monkeypatch.setattr('backend.agents.wave1.clinical_trials', lambda *a, **k: {'studies': []})
 
     async def generate_one(output, instructions, evidence, **kwargs):

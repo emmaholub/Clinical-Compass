@@ -10,6 +10,7 @@ from backend.data_sources import (
     openfda_faers,
     openfda_label,
     label_documents,
+    medlineplus_documents,
     published_findings,
     search_guidelines,
 )
@@ -145,3 +146,24 @@ def test_discovers_recommendations_for_another_disease(tmp_path):
         docs = search_guidelines('asthma', client=CachedJsonClient(tmp_path, client=http))
     assert len(docs) == 1
     assert docs[0].source_url == 'https://www.nice.org.uk/guidance/ng245/chapter/Recommendations'
+
+
+def test_medlineplus_fallback_returns_plain_language_summary(tmp_path):
+    raw = '''<?xml version="1.0"?><nlmSearchResult><list><document
+        url="https://medlineplus.gov/example.html"><content name="title">Example condition</content>
+        <content name="FullSummary">What is example condition?&lt;p&gt;It can cause pain and fatigue.&lt;/p&gt;</content>
+        </document></list></nlmSearchResult>'''
+
+    def handler(request):
+        assert request.url.host == 'wsearch.nlm.nih.gov'
+        return httpx.Response(200, text=raw)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        docs = medlineplus_documents(
+            'example condition',
+            client=CachedJsonClient(tmp_path, client=http),
+        )
+    assert len(docs) == 1
+    assert docs[0].source_url == 'https://medlineplus.gov/example.html'
+    assert 'pain and fatigue' in docs[0].text
+    assert docs[0].kind == 'NIH disease information'

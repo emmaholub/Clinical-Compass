@@ -17,13 +17,16 @@ import httpx
 from lxml import etree, html
 
 DEFAULT_TIMEOUT = 15.0
-DEFAULT_CACHE_DIR = Path(__file__).resolve().parent.parent / "cache" / "evidence-v2"
+# Bump when source parsing or relevance rules change; stale documents should
+# not survive a parser fix and make the UI look broken after deployment.
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parent.parent / "cache" / "evidence-v3"
 OPENFDA_LABELS_URL = "https://api.fda.gov/drug/label.json"
 OPENFDA_FAERS_URL = "https://api.fda.gov/drug/event.json"
 DAILYMED_SEARCH_URL = "https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json"
 CLINICAL_TRIALS_URL = "https://clinicaltrials.gov/api/v2/studies"
 PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+MEDLINEPLUS_SEARCH_URL = "https://wsearch.nlm.nih.gov/ws/query"
 _NCBI_LOCK = threading.Lock()
 _NCBI_LAST = 0.0
 
@@ -267,9 +270,65 @@ def _html_text(raw: str) -> str:
     return _text(main[0] if main else tree)
 
 
+def _usable_document(text: str, *, minimum: int = 40) -> bool:
+    """Reject challenge pages and empty shells returned with HTTP 200."""
+    lowered = text.casefold()
+    return len(text) >= minimum and not any(
+        marker in lowered for marker in ("human verification", "access denied", "just a moment")
+    )
+
+
+def medlineplus_documents(disease: str, *, client: CachedJsonClient | None = None,
+                          max_results: int = 2) -> list[Document]:
+    """Return NLM/MedlinePlus plain-language health-topic summaries."""
+    with _client(client) as api:
+        raw = api.text(MEDLINEPLUS_SEARCH_URL, {
+            "db": "healthTopics", "term": disease, "retmax": max_results + 3,
+        })
+        root = etree.fromstring(raw.encode(), parser=etree.XMLParser(resolve_entities=False, no_network=True))
+        ranked_documents: list[tuple[int, int, Document]] = []
+        # Keep digits so "type 2 diabetes" cannot accidentally return the
+        # type-1 topic merely because both summaries contain "type" and
+        # "diabetes".
+        disease_tokens = [token for token in re.findall(r"[a-z0-9]+", disease.casefold())
+                          if len(token) > 1 or token.isdigit()]
+        for item in root.xpath("//document"):
+            url = item.get("url", "")
+            title_node = item.xpath('./content[@name="title"]')
+            summary_node = item.xpath('./content[@name="FullSummary"]')
+            title = _text(html.fromstring(title_node[0].text or "")) if title_node else "MedlinePlus health topic"
+            summary = _text(html.fromstring(summary_node[0].text or "")) if summary_node else ""
+            title_haystack = title.casefold()
+            haystack = f"{title} {summary}".casefold()
+            if (not url or not summary
+                    or any(token.isdigit() and token not in title_haystack for token in disease_tokens)
+                    or disease_tokens and not all(token in title_haystack for token in disease_tokens)
+                    and not all(token in haystack for token in disease_tokens)):
+                continue
+            score = sum(token in title_haystack for token in disease_tokens)
+            title_tokens = set(re.findall(r"[a-z0-9]+", title_haystack)) - {"s"}
+            if title_tokens == set(disease_tokens):
+                score += 100
+            try:
+                rank = int(item.get("rank", "9999"))
+            except ValueError:
+                rank = 9999
+            ranked_documents.append((score, -rank,
+                                     Document(url, f"MedlinePlus: {title}", summary, "NIH disease information")))
+        ranked_documents.sort(key=lambda row: (row[0], row[1]), reverse=True)
+        exact = [row for row in ranked_documents if row[0] >= 100]
+        if exact:
+            ranked_documents = exact
+        return [document for _, _, document in ranked_documents[:max_results]]
+
+
 GUIDELINES = {
     "rheumatoid arthritis": [("NICE (UK): Rheumatoid arthritis in adults", "https://www.nice.org.uk/guidance/ng100/chapter/Recommendations")],
-    "type 2 diabetes": [("NICE (UK): Type 2 diabetes in adults", "https://www.nice.org.uk/guidance/ng28/chapter/Recommendations")],
+    "type 2 diabetes": [
+        ("NICE (UK): Type 2 diabetes in adults", "https://www.nice.org.uk/guidance/ng28/chapter/Recommendations"),
+        ("American Diabetes Association: Pharmacologic Approaches to Glycemic Treatment (2026)",
+         "https://diabetesjournals.org/care/article/49/Supplement_1/S183/163934/9-Pharmacologic-Approaches-to-Glycemic-Treatment"),
+    ],
     "alzheimer's disease": [("NICE (UK): Dementia management", "https://www.nice.org.uk/guidance/ng97/chapter/Recommendations")],
 }
 
@@ -279,7 +338,8 @@ def search_guidelines(disease: str, *, max_results: int = 5,
     disease = normalize_disease(disease)
     docs = []
     with _client(client) as api:
-        candidates = GUIDELINES.get(disease.casefold(), [])
+        # Dynamic discovery must not mutate the process-wide configured map.
+        candidates = list(GUIDELINES.get(disease.casefold(), []))
         if not candidates:
             try:
                 search_page = api.text("https://www.nice.org.uk/search", {"q": disease})
@@ -293,24 +353,29 @@ def search_guidelines(disease: str, *, max_results: int = 5,
                             if pair not in candidates:
                                 candidates.append(pair)
                 candidates = candidates[:3]
-            except httpx.HTTPError:
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError):
                 pass
         for title, url in candidates:
             try:
                 raw = api.text(url)
-                docs.append(Document(url, title, _html_text(raw), "Guideline"))
+                text = _html_text(raw)
+                if not _usable_document(text):
+                    continue
+                docs.append(Document(url, title, text, "Guideline"))
                 if disease == "type 2 diabetes":
                     links = html.fromstring(raw).xpath('//a/@href')
                     links = sorted({urljoin(url, link) for link in links if "/chapter/" in link and any(w in link.lower() for w in ("medicine", "drug", "pharmacological"))})
                     for link in links[:3]:
                         if urlparse(link).hostname == "www.nice.org.uk":
-                            docs.append(Document(link, title, _html_text(api.text(link)), "Guideline"))
-            except httpx.HTTPError:
+                            text = _html_text(api.text(link))
+                            if _usable_document(text):
+                                docs.append(Document(link, title, text, "Guideline"))
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError):
                 continue
         if not docs:
             try:
                 docs.extend(published_findings(disease, "treatment", client=api, guidelines=True))
-            except httpx.HTTPError:
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError, RuntimeError):
                 pass
         # Rare diseases often have no NICE guideline page. Use an authoritative
         # US government disease page plus an FDA label as a clearly identified
@@ -318,8 +383,10 @@ def search_guidelines(disease: str, *, max_results: int = 5,
         if not docs and disease.casefold() == "rett syndrome":
             try:
                 url = "https://www.ninds.nih.gov/health-information/disorders/rett-syndrome"
-                docs.append(Document(url, "NINDS: Rett Syndrome", _html_text(api.text(url)), "NIH disease information"))
-            except httpx.HTTPError:
+                text = _html_text(api.text(url))
+                if _usable_document(text):
+                    docs.append(Document(url, "NINDS: Rett Syndrome", text, "NIH disease information"))
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError):
                 pass
             try:
                 _, label_docs = label_documents("trofinetide", client=api)
@@ -346,13 +413,20 @@ def overview_documents(disease: str, *, client: CachedJsonClient | None = None,
         if disease.casefold() in urls:
             title, url = urls[disease.casefold()]
             try:
-                docs.append(Document(url, title, _html_text(api.text(url)), "NIH disease information"))
-            except httpx.HTTPError:
+                text = _html_text(api.text(url))
+                if _usable_document(text):
+                    docs.append(Document(url, title, text, "NIH disease information"))
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError):
                 pass
         if not docs:
             try:
+                docs = medlineplus_documents(disease, client=api, max_results=max_results)
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError, RuntimeError):
+                docs = []
+        if not docs:
+            try:
                 docs = published_findings(disease, "disease overview", client=api, guidelines=False)
-            except httpx.HTTPError:
+            except (httpx.HTTPError, etree.XMLSyntaxError, ValueError, RuntimeError):
                 docs = []
         return docs[:max_results]
 

@@ -14,7 +14,12 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import UsageLimits
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+# The course runner keeps shared secrets one directory above each cloned repo.
+# Load the repo file first, then the shared file without overwriting either a
+# shell variable or a repo-local value.
+load_dotenv(_REPO_ROOT / ".env")
+load_dotenv(_REPO_ROOT.parent / ".env")
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -30,7 +35,7 @@ async def generate(output: Type[T], instructions: str, evidence: str, validate=N
         max_retries=0,
     ) as client:
         model = OpenAIModel(
-            os.getenv("PORTKEY_MODEL") or "gpt-4o-mini",
+            os.getenv("PORTKEY_MODEL") or "gpt-6-luna",
             provider=OpenAIProvider(openai_client=client),
         )
         agent = Agent(
@@ -40,7 +45,14 @@ async def generate(output: Type[T], instructions: str, evidence: str, validate=N
                 "Use only supplied evidence. Copy source quotes exactly and use their supplied URLs. "
                 "Never infer a treatment recommendation from prescribing volume. " + instructions
             ),
-            model_settings={"extra_body": {"max_completion_tokens": 5000}},
+            # gpt-6-luna uses reasoning by default, but the course gateway's
+            # chat-completions route rejects reasoning alongside PydanticAI's
+            # structured-output function tools. Disable it explicitly so the
+            # schema-constrained workers can run on the required course model.
+            model_settings={
+                "openai_reasoning_effort": "none",
+                "extra_body": {"max_completion_tokens": 5000},
+            },
         )
         if validate:
             attempts = 0
